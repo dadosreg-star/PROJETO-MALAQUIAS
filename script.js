@@ -1,6 +1,5 @@
 lucide.createIcons();
 
-// --- BANCO DE DADOS LOCAL ---
 let usuarios = JSON.parse(localStorage.getItem('usuarios')) || [{ nome: "Administrador", login: "admin", pass: "123" }];
 let modalidades = JSON.parse(localStorage.getItem('modalidades')) || [];
 let alunos = JSON.parse(localStorage.getItem('alunos')) || [];
@@ -8,6 +7,7 @@ let professores = JSON.parse(localStorage.getItem('professores')) || [];
 let presencas = JSON.parse(localStorage.getItem('presencas')) || {};
 
 let usuarioLogado = null;
+let streamCamera = null;
 
 // --- LOGIN ---
 function autenticar() {
@@ -23,8 +23,8 @@ function autenticar() {
         document.getElementById('user-avatar').innerText = (user.nome || user.login).charAt(0).toUpperCase();
         
         const hoje = new Date().toISOString().substring(0, 7);
-        document.getElementById('filtro-mes').value = hoje;
-        document.getElementById('rel-mes').value = hoje;
+        if(document.getElementById('filtro-mes')) document.getElementById('filtro-mes').value = hoje;
+        if(document.getElementById('rel-mes')) document.getElementById('rel-mes').value = hoje;
     } else { alert("Usuário ou senha inválidos."); }
 }
 
@@ -36,24 +36,46 @@ function validarAdmin() {
     return true;
 }
 
+// --- CONTROLE DE CÂMERA ---
+async function iniciarCamera(tipo) {
+    const wrapper = document.getElementById(`camera-wrapper-${tipo}`);
+    const video = document.getElementById(`video-${tipo}`);
+    try {
+        streamCamera = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        video.srcObject = streamCamera;
+        wrapper.style.display = 'block';
+        lucide.createIcons();
+    } catch (err) { alert("Não foi possível acessar a câmera."); }
+}
+
+function capturarFoto(tipo) {
+    const video = document.getElementById(`video-${tipo}`);
+    const previewId = tipo === 'aluno' ? 'preview-aluno' : 'preview-professor';
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/png');
+    document.getElementById(previewId).innerHTML = `<img src="${dataUrl}">`;
+    pararCamera(tipo);
+}
+
+function pararCamera(tipo) {
+    if (streamCamera) { streamCamera.getTracks().forEach(track => track.stop()); streamCamera = null; }
+    const wrapper = document.getElementById(`camera-wrapper-${tipo}`);
+    if(wrapper) wrapper.style.display = 'none';
+}
+
 // --- NAVEGAÇÃO ---
 function irPara(tela) {
     document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('screen-' + tela).style.display = 'block';
-    
     const navBtn = document.getElementById('nav-' + tela);
     if(navBtn) navBtn.classList.add('active');
-    
     if(tela === 'chamada' || tela === 'relatorios') preencherFiltros(tela);
     if(tela === 'dados') renderBuscaGeral();
-    
-    const titulos = { 
-        'home': 'Painel Administrativo', 
-        'chamada': 'Controle de Frequência', 
-        'relatorios': 'Relatórios e Documentos',
-        'dados': 'Consulta de Dados Cadastrados' 
-    };
+    const titulos = { 'home': 'Painel Administrativo', 'chamada': 'Controle de Frequência', 'relatorios': 'Relatórios e Documentos', 'dados': 'Consulta de Dados Cadastrados' };
     document.getElementById('page-title').innerText = titulos[tela];
 }
 
@@ -63,9 +85,7 @@ function renderBuscaGeral() {
     const term = document.getElementById('input-busca-geral').value.toLowerCase();
     const head = document.getElementById('head-busca-geral');
     const body = document.getElementById('body-busca-geral');
-    
-    let htmlHead = "";
-    let htmlBody = "";
+    let htmlHead = ""; let htmlBody = "";
 
     if (cat === 'alunos') {
         htmlHead = "<tr><th>Nome</th><th>Modalidade</th><th>Contato</th><th>Ações</th></tr>";
@@ -84,18 +104,14 @@ function renderBuscaGeral() {
         const filtrados = usuarios.filter(u => u.nome.toLowerCase().includes(term));
         htmlBody = filtrados.map((u, i) => `<tr><td>${u.nome}</td><td>${u.login}</td><td>${u.login !== 'admin' ? `<button class="btn-edit" onclick="editarGeral('user', ${usuarios.indexOf(u)})">Editar</button> <button class="btn-delete" onclick="removerGeral('user', ${usuarios.indexOf(u)})">Excluir</button>` : '---'}</td></tr>`).join('');
     }
-
-    head.innerHTML = htmlHead;
-    body.innerHTML = htmlBody;
+    head.innerHTML = htmlHead; body.innerHTML = htmlBody;
 }
 
 // --- EDIÇÃO E REMOÇÃO ---
 function editarGeral(tipo, index) {
     if (tipo === 'user' && !validarAdmin()) return;
-
     if(tipo === 'aluno') {
-        const a = alunos[index];
-        abrirModal('aluno');
+        const a = alunos[index]; abrirModal('aluno');
         document.getElementById('edit-aluno-index').value = index;
         document.getElementById('aluno-nome').value = a.nome;
         document.getElementById('aluno-nascimento').value = a.nascimento;
@@ -112,9 +128,9 @@ function editarGeral(tipo, index) {
         document.getElementById('aluno-obs').value = a.obs || '';
         if(a.foto) document.getElementById('preview-aluno').innerHTML = `<img src="${a.foto}">`;
         document.getElementById('btn-aluno-save').innerText = "Salvar Alterações";
+        setTimeout(calcularIMC, 100);
     } else if (tipo === 'prof') {
-        const p = professores[index];
-        abrirModal('professor');
+        const p = professores[index]; abrirModal('professor');
         document.getElementById('edit-prof-index').value = index;
         document.getElementById('prof-nome').value = p.nome;
         document.getElementById('prof-cpf').value = p.cpf;
@@ -122,8 +138,7 @@ function editarGeral(tipo, index) {
         if(p.foto) document.getElementById('preview-professor').innerHTML = `<img src="${p.foto}">`;
         document.getElementById('btn-prof-save').innerText = "Salvar Alterações";
     } else if (tipo === 'mod') {
-        const m = modalidades[index];
-        abrirModal('modalidades');
+        const m = modalidades[index]; abrirModal('modalidades');
         document.getElementById('mod-index').value = index;
         document.getElementById('mod-nome').value = m.nome;
         document.getElementById('mod-professor').value = m.professor;
@@ -132,8 +147,7 @@ function editarGeral(tipo, index) {
         document.querySelectorAll('input[name="dia"]').forEach(cb => cb.checked = m.dias.includes(cb.value));
         document.getElementById('btn-salvar-modalidade').innerText = "Salvar Alterações";
     } else if (tipo === 'user') {
-        const u = usuarios[index];
-        abrirModal('usuario');
+        const u = usuarios[index]; abrirModal('usuario');
         document.getElementById('edit-user-index').value = index;
         document.getElementById('new-user-nome').value = u.nome;
         document.getElementById('new-user-login').value = u.login;
@@ -144,7 +158,7 @@ function editarGeral(tipo, index) {
 
 function removerGeral(tipo, index) {
     if (tipo === 'user' && !validarAdmin()) return;
-    if(!confirm("Tem certeza que deseja excluir?")) return;
+    if(!confirm("Deseja excluir?")) return;
     if(tipo === 'aluno') alunos.splice(index, 1);
     else if(tipo === 'prof') professores.splice(index, 1);
     else if(tipo === 'mod') modalidades.splice(index, 1);
@@ -164,18 +178,27 @@ function abrirModal(id) {
     if (id === 'usuario' && !validarAdmin()) return;
     document.getElementById('modal-' + id).classList.add('active');
     if (id === 'aluno') {
-        preencherSelectsAluno();
-        document.getElementById('form-aluno').reset();
+        preencherSelectsAluno(); document.getElementById('form-aluno').reset();
         document.getElementById('edit-aluno-index').value = "-1";
         document.getElementById('preview-aluno').innerHTML = '<i data-lucide="camera"></i>';
         document.getElementById('btn-aluno-save').innerText = "Salvar Registro";
-        lucide.createIcons();
+        document.getElementById('imc-needle').style.transform = `rotate(-90deg)`;
+        pararCamera('aluno'); lucide.createIcons();
+    }
+    if (id === 'professor') {
+        document.getElementById('form-professor').reset();
+        document.getElementById('edit-prof-index').value = "-1";
+        document.getElementById('preview-professor').innerHTML = '<i data-lucide="camera"></i>';
+        document.getElementById('btn-prof-save').innerText = "Salvar Professor";
+        pararCamera('prof'); lucide.createIcons();
     }
     if (id === 'acesso') renderAcessos();
 }
 
 function fecharModal(id) { 
     document.getElementById('modal-' + id).classList.remove('active'); 
+    if(id === 'aluno') pararCamera('aluno');
+    if(id === 'professor') pararCamera('prof');
 }
 
 function preencherSelectsAluno() {
@@ -185,16 +208,107 @@ function preencherSelectsAluno() {
     sProf.innerHTML = professores.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
 }
 
+// --- CALCULO IMC E VELOCIMETRO ---
 function calcularIMC() {
     const peso = parseFloat(document.getElementById('aluno-peso').value);
     const altura = parseFloat(document.getElementById('aluno-altura').value);
     const fieldIMC = document.getElementById('aluno-imc');
+    const needle = document.getElementById('imc-needle');
     if (peso > 0 && altura > 0) {
-        fieldIMC.value = (peso / (altura * altura)).toFixed(2);
-    } else { fieldIMC.value = ""; }
+        const imc = peso / (altura * altura); fieldIMC.value = imc.toFixed(2);
+        let deg = -90;
+        if (imc < 18.5) deg = -90 + (imc / 18.5) * 27; 
+        else if (imc < 25) deg = -63 + ((imc - 18.5) / 6.5) * 54;
+        else if (imc < 30) deg = -9 + ((imc - 25) / 5) * 54;
+        else deg = 45 + Math.min(((imc - 30) / 10) * 45, 45);
+        needle.style.transform = `rotate(${deg}deg)`;
+    } else { fieldIMC.value = ""; needle.style.transform = `rotate(-90deg)`; }
 }
 
-// --- SALVAMENTO ---
+// --- FUNÇÃO ATUALIZADA: GERAR DIETA EM PDF COM REFEIÇÕES ---
+function gerarArquivoDieta() {
+    const nome = document.getElementById('aluno-nome').value || "Aluno";
+    const imc = parseFloat(document.getElementById('aluno-imc').value);
+    const peso = document.getElementById('aluno-peso').value;
+    const altura = document.getElementById('aluno-altura').value;
+
+    if (isNaN(imc)) { alert("Preencha Peso e Altura para o cálculo do IMC."); return; }
+
+    let info = { cat: "", cafe: "", lancheM: "", almoco: "", lancheT: "", jantar: "", obs: "" };
+
+    if (imc < 18.5) {
+        info.cat = "Abaixo do Peso (Foco: Hipertrofia/Ganho)";
+        info.cafe = "Vitamina de banana com aveia e pasta de amendoim + 2 ovos mexidos.";
+        info.lancheM = "Mix de castanhas e uma fruta (maçã ou pera).";
+        info.almoco = "Arroz, feijão, 150g de carne vermelha ou frango, salada e azeite.";
+        info.lancheT = "Sanduíche natural de frango com pão integral.";
+        info.jantar = "Macarrão integral com patinho moído e legumes no vapor.";
+        info.obs = "Aumente o aporte calórico com gorduras boas.";
+    } else if (imc < 25) {
+        info.cat = "Peso Normal (Foco: Manutenção e Performance)";
+        info.cafe = "Café sem açúcar, pão integral com queijo branco e uma fruta.";
+        info.lancheM = "Iogurte natural com granola sem açúcar.";
+        info.almoco = "Arroz integral (2 colheres), peito de frango grelhado e muita salada verde.";
+        info.lancheT = "Uma fruta e 3 castanhas-do-pará.";
+        info.jantar = "Omelete com 3 ovos e espinafre + salada de tomate.";
+        info.obs = "Mantenha a hidratação: 35ml de água por kg de peso.";
+    } else if (imc < 30) {
+        info.cat = "Sobrepeso (Foco: Definição/Redução Gradual)";
+        info.cafe = "Café ou chá, 2 ovos cozidos e 1 fatia de mamão.";
+        info.lancheM = "1/2 abacate pequeno (sem açúcar).";
+        info.almoco = "Proteína magra (peixe ou frango), legumes variados e pouca fonte de carboidrato.";
+        info.lancheT = "Iogurte desnatado ou chá verde com torradas integrais.";
+        info.jantar = "Sopa de legumes com frango desfiado (sem macarrão/batata).";
+        info.obs = "Evite ultraprocessados e doces durante a semana.";
+    } else {
+        info.cat = "Obesidade (Foco: Reeducação e Déficit Calórico)";
+        info.cafe = "Suco detox (couve/limão), 1 ovo cozido.";
+        info.lancheM = "Uma maçã.";
+        info.almoco = "Salada de folhas à vontade, 120g de proteína magra e brócolis.";
+        info.lancheT = "Chá de hibisco e 2 fatias de queijo ricota.";
+        info.jantar = "Filé de frango grelhado e mix de folhas.";
+        info.obs = "Caminhadas leves de 30 min são fundamentais para iniciar.";
+    }
+
+    const htmlContent = `
+        <div style="margin-top:20px;">
+            <p><strong>ALUNO(A):</strong> ${nome.toUpperCase()}</p>
+            <p><strong>PESO:</strong> ${peso}kg | <strong>ALTURA:</strong> ${altura}m | <strong>IMC:</strong> ${imc.toFixed(2)}</p>
+            <p><strong>CLASSIFICAÇÃO:</strong> <span style="color:#3b82f6;">${info.cat}</span></p>
+            
+            <h3 style="background:#f1f5f9; padding:8px; border-left:5px solid #3b82f6; margin-top:25px;">SUGESTÃO DE CARDÁPIO DIÁRIO</h3>
+            <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+                <tr><td style="padding:10px; border:1px solid #ddd;"><strong>Café da Manhã</strong></td><td style="padding:10px; border:1px solid #ddd;">${info.cafe}</td></tr>
+                <tr><td style="padding:10px; border:1px solid #ddd;"><strong>Lanche da Manhã</strong></td><td style="padding:10px; border:1px solid #ddd;">${info.lancheM}</td></tr>
+                <tr><td style="padding:10px; border:1px solid #ddd;"><strong>Almoço</strong></td><td style="padding:10px; border:1px solid #ddd;">${info.almoco}</td></tr>
+                <tr><td style="padding:10px; border:1px solid #ddd;"><strong>Lanche da Tarde</strong></td><td style="padding:10px; border:1px solid #ddd;">${info.lancheT}</td></tr>
+                <tr><td style="padding:10px; border:1px solid #ddd;"><strong>Jantar</strong></td><td style="padding:10px; border:1px solid #ddd;">${info.jantar}</td></tr>
+            </table>
+
+            <h3 style="background:#f1f5f9; padding:8px; border-left:5px solid #10b981; margin-top:25px;">ORIENTAÇÕES GERAIS</h3>
+            <p style="padding:10px; font-style:italic;">${info.obs}</p>
+            <p><strong>Data de Geração:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+        </div>
+    `;
+
+    document.getElementById('pdf-corpo').innerHTML = htmlContent;
+    const element = document.getElementById('template-pdf');
+    element.style.display = 'block';
+
+    const opt = {
+        margin: 10,
+        filename: `Dieta_${nome.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        element.style.display = 'none';
+    });
+}
+
+// --- SALVAMENTO E OUTROS MÉTODOS MANTIDOS ---
 document.getElementById('form-aluno').onsubmit = function(e) {
     e.preventDefault();
     const index = parseInt(document.getElementById('edit-aluno-index').value);
@@ -230,17 +344,14 @@ document.getElementById('form-professor').onsubmit = function(e) {
     };
     if(index === -1) professores.push(dados); else professores[index] = dados;
     saveAll(); fecharModal('professor');
+    if(document.getElementById('screen-dados').style.display === 'block') renderBuscaGeral();
 };
 
 document.getElementById('form-usuario').onsubmit = function(e) {
     e.preventDefault();
     if (!validarAdmin()) return;
     const index = parseInt(document.getElementById('edit-user-index').value);
-    const dados = {
-        nome: document.getElementById('new-user-nome').value,
-        login: document.getElementById('new-user-login').value,
-        pass: document.getElementById('new-user-pass').value
-    };
+    const dados = { nome: document.getElementById('new-user-nome').value, login: document.getElementById('new-user-login').value, pass: document.getElementById('new-user-pass').value };
     if(index === -1) {
         if (usuarios.some(u => u.login === dados.login)) return alert("Login já existe!");
         usuarios.push(dados);
@@ -252,18 +363,11 @@ document.getElementById('form-modalidade').onsubmit = function(e) {
     e.preventDefault();
     const index = parseInt(document.getElementById('mod-index').value);
     const diasSel = Array.from(document.querySelectorAll('input[name="dia"]:checked')).map(el => el.value);
-    const dados = {
-        nome: document.getElementById('mod-nome').value,
-        professor: document.getElementById('mod-professor').value,
-        dias: diasSel,
-        inicio: document.getElementById('mod-inicio').value,
-        fim: document.getElementById('mod-fim').value
-    };
+    const dados = { nome: document.getElementById('mod-nome').value, professor: document.getElementById('mod-professor').value, dias: diasSel, inicio: document.getElementById('mod-inicio').value, fim: document.getElementById('mod-fim').value };
     if (index === -1) modalidades.push(dados); else modalidades[index] = dados;
     saveAll(); fecharModal('modalidades');
 };
 
-// --- UTILITÁRIOS ---
 function previewImage(input, previewId) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
@@ -277,7 +381,6 @@ function preencherFiltros(tela) {
     const optM = '<option value="Todos">Todas Modalidades</option>' + modalidades.map(m => `<option value="${m.nome}">${m.nome}</option>`).join('');
     const sMod = document.getElementById(`${prefix}-modalidade`);
     if(sMod) sMod.innerHTML = optM; 
-
     const sProf = document.getElementById(`${prefix}-professor`);
     if(sProf) {
         const optP = '<option value="Todos">Todos Professores</option>' + professores.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
@@ -287,11 +390,7 @@ function preencherFiltros(tela) {
 
 function logout() { location.reload(); }
 
-window.onclick = e => { 
-    if (e.target.classList.contains('modal-overlay')) {
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-    }
-};
+window.onclick = e => { if (e.target.classList.contains('modal-overlay')) fecharModal(e.target.id.split('-')[1]); };
 
 function renderAcessos() {
     const corpo = document.getElementById('tabela-acessos-corpo');
@@ -300,7 +399,6 @@ function renderAcessos() {
     `).join('');
 }
 
-// --- CHAMADA ---
 function gerarTabelaChamada() {
     const mesRef = document.getElementById('filtro-mes').value;
     const modF = document.getElementById('filtro-modalidade').value;
@@ -352,43 +450,23 @@ function gerarRelatorio(tipo) {
     }
 }
 
-// --- FUNÇÃO DE IMPORTAÇÃO (NOVA) ---
 async function importarDados() {
     const url = document.getElementById('link-planilha').value;
     if (!url) return alert("Por favor, insira o link do CSV.");
-
     try {
         const response = await fetch(url);
         const data = await response.text();
-        const rows = data.split('\n').slice(1); // Ignora o cabeçalho
-
+        const rows = data.split('\n').slice(1);
         let novosAlunos = 0;
         rows.forEach(row => {
             const cols = row.split(',').map(c => c.trim());
             if (cols.length >= 6 && cols[0] !== "") {
-                const aluno = {
-                    nome: cols[0],
-                    nascimento: cols[1],
-                    contato: cols[2],
-                    endereco: cols[3],
-                    modalidade: cols[4],
-                    professor: cols[5],
-                    foto: null
-                };
-                // Verifica se já existe para não duplicar exatamente igual
-                if (!alunos.some(a => a.nome === aluno.nome)) {
-                    alunos.push(aluno);
-                    novosAlunos++;
-                }
+                const aluno = { nome: cols[0], nascimento: cols[1], contato: cols[2], endereco: cols[3], modalidade: cols[4], professor: cols[5], foto: null };
+                if (!alunos.some(a => a.nome === aluno.nome)) { alunos.push(aluno); novosAlunos++; }
             }
         });
-
-        saveAll();
-        renderBuscaGeral();
-        alert(`Importação concluída! ${novosAlunos} novos alunos adicionados.`);
+        saveAll(); renderBuscaGeral();
+        alert(`Importação concluída! ${novosAlunos} novos alunos.`);
         document.getElementById('link-planilha').value = "";
-    } catch (error) {
-        console.error(error);
-        alert("Erro ao importar dados. Verifique se o link está correto e se a planilha está pública como CSV.");
-    }
+    } catch (error) { alert("Erro ao importar dados."); }
 }
