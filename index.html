@@ -6,6 +6,7 @@
     <title>Projeto Malaquias - Sistema de Gestão</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -14,11 +15,11 @@
             <div class="logo"><i data-lucide="shield-check"></i><h1> Projeto Malaquias</h1></div>
             <div class="form-group">
                 <label>Usuário</label>
-                <input type="text" id="username" placeholder="admin">
+                <input type="text" id="username" placeholder="Digite seu usuário">
             </div>
             <div class="form-group">
                 <label>Senha</label>
-                <input type="password" id="password" placeholder="123">
+                <input type="password" id="password" placeholder="Digite sua senha">
             </div>
             <button class="btn-main" onclick="autenticar()">Entrar</button>
             <h2 class="dev-tag">Desenvolvedor : Everton Souza</h2>
@@ -31,6 +32,7 @@
             <nav>
                 <button onclick="irPara('home')" id="nav-home" class="nav-item active"><i data-lucide="layout-dashboard"></i> Início</button>
                 <button onclick="irPara('chamada')" id="nav-chamada" class="nav-item"><i data-lucide="user-check"></i> Chamada</button>
+                <button onclick="irPara('avaliacao')" id="nav-avaliacao" class="nav-item"><i data-lucide="clipboard-list"></i> Avaliação</button>
                 <button onclick="irPara('relatorios')" id="nav-relatorios" class="nav-item"><i data-lucide="file-text"></i> Relatórios</button>
                 <button onclick="logout()" class="nav-item logout"><i data-lucide="log-out"></i> Sair</button>
             </nav>
@@ -69,6 +71,33 @@
                 </div>
             </section>
 
+            <section id="screen-avaliacao" class="screen" style="display:none;">
+                <div class="glass-card">
+                    <div class="form-group">
+                        <label>Buscar Aluno para Avaliação</label>
+                        <input type="text" id="input-busca-avaliacao" placeholder="Digite o nome do aluno..." oninput="renderBuscaAvaliacao()">
+                    </div>
+                    <div class="table-container">
+                        <table class="table-dados">
+                            <thead>
+                                <tr><th>Aluno</th><th>Modalidade</th><th>Ação</th></tr>
+                            </thead>
+                            <tbody id="body-busca-avaliacao"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="container-grafico-evolucao" class="glass-card" style="display: none; margin-top: 20px; border-color: #a855f7;">
+                    <div class="modal-header">
+                        <h3>Evolução de <span id="nome-aluno-grafico"></span></h3>
+                        <button class="btn-close" onclick="fecharGrafico()">×</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chartEvolucao"></canvas>
+                    </div>
+                </div>
+            </section>
+
             <section id="screen-relatorios" class="screen" style="display:none;">
                 <div class="glass-card">
                     <div class="filters-grid">
@@ -79,6 +108,7 @@
                     <div class="btn-group">
                         <button class="btn-main" onclick="gerarRelatorio('filtro')" style="background: #22c55e;">Gerar Frequência</button>
                         <button class="btn-main" onclick="gerarRelatorio('geral')" style="background: #3b82f6;">Lista Geral Alunos</button>
+                        <button class="btn-main" onclick="gerarRelatorio('avaliacoes')" style="background: #a855f7;">Relatório de Avaliações</button>
                         <button class="btn-main" onclick="window.print()" style="background: #64748b; width: 140px;"><i data-lucide="printer"></i> Imprimir</button>
                     </div>
                     <div id="print-area" class="relatorio-impressao">
@@ -142,7 +172,10 @@
                 <div class="photo-section">
                     <div class="camera-container" id="camera-wrapper-aluno" style="display:none;">
                         <video id="video-aluno" autoplay playsinline></video>
-                        <button type="button" class="btn-capture" onclick="capturarFoto('aluno')"><i data-lucide="camera"></i></button>
+                        <div class="camera-controls">
+                            <button type="button" class="btn-switch" onclick="alternarCamera('aluno')"><i data-lucide="refresh-cw"></i></button>
+                            <button type="button" class="btn-capture" onclick="capturarFoto('aluno')"><i data-lucide="camera"></i></button>
+                        </div>
                     </div>
                     <div class="avatar-preview" id="preview-aluno"><i data-lucide="camera"></i></div>
                     <div class="btn-photo-group">
@@ -163,7 +196,7 @@
                     <div class="form-group"><label>Modalidade</label><select id="aluno-modalidade" required></select></div>
                     <div class="form-group"><label>Professor</label><select id="aluno-professor" required></select></div>
                 </div>
-
+                
                 <h4 class="section-title">Dados Antropométricos</h4>
                 <div class="form-row-triple">
                     <div class="form-group"><label>Peso (kg)</label><input type="number" step="0.1" id="aluno-peso" oninput="calcularIMC()"></div>
@@ -183,25 +216,22 @@
                         <span style="color: #3b82f6;">Abaixo</span>
                         <span style="color: #22c55e;">Normal</span>
                         <span style="color: #eab308;">Sobrepeso</span>
-                        <span style="color: #ef4444;">Obesidade</span>
+                        <span style="color: #ef4444;">Obeso</span>
                     </div>
-                    <button type="button" id="btn-sugerir-dieta" class="btn-diet" onclick="gerarArquivoDieta()">
-                        <i data-lucide="apple"></i> Sugerir Dieta Baseada no IMC
-                    </button>
                 </div>
-                
+
+                <h4 class="section-title">Medidas (cm)</h4>
                 <div class="form-row-triple">
-                    <div class="form-group"><label>Cintura (cm)</label><input type="number" step="0.1" id="aluno-cintura"></div>
-                    <div class="form-group"><label>Tórax (cm)</label><input type="number" step="0.1" id="aluno-torax"></div>
-                    <div class="form-group"><label>Quadril (cm)</label><input type="number" step="0.1" id="aluno-quadril"></div>
+                    <div class="form-group"><label>Cintura</label><input type="number" id="aluno-cintura"></div>
+                    <div class="form-group"><label>Tórax</label><input type="number" id="aluno-torax"></div>
+                    <div class="form-group"><label>Quadril</label><input type="number" id="aluno-quadril"></div>
                 </div>
+                <div class="form-group"><label>Observações</label><textarea id="aluno-obs" rows="3"></textarea></div>
 
-                <div class="form-group">
-                    <label>Observações / Histórico Médico</label>
-                    <textarea id="aluno-obs" rows="3" style="width: 100%; background: var(--glass); border: 1px solid var(--border); border-radius: 8px; color: white; padding: 10px; resize: none;"></textarea>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn-diet" onclick="gerarArquivoDieta()"><i data-lucide="apple"></i> Dieta Sugerida (PDF)</button>
+                    <button type="submit" id="btn-aluno-save" class="btn-main">Salvar Registro</button>
                 </div>
-
-                <button type="submit" class="btn-main" id="btn-aluno-save">Salvar Registro</button>
             </form>
         </div>
     </div>
@@ -214,37 +244,23 @@
                 <div class="photo-section">
                     <div class="camera-container" id="camera-wrapper-prof" style="display:none;">
                         <video id="video-prof" autoplay playsinline></video>
-                        <button type="button" class="btn-capture" onclick="capturarFoto('prof')"><i data-lucide="camera"></i></button>
+                        <div class="camera-controls">
+                            <button type="button" class="btn-switch" onclick="alternarCamera('prof')"><i data-lucide="refresh-cw"></i></button>
+                            <button type="button" class="btn-capture" onclick="capturarFoto('prof')"><i data-lucide="camera"></i></button>
+                        </div>
                     </div>
-
                     <div class="avatar-preview" id="preview-professor"><i data-lucide="camera"></i></div>
-                    
                     <div class="btn-photo-group">
-                        <label for="input-foto-prof" class="btn-photo">Arquivo</label>
+                        <label for="input-foto-professor" class="btn-photo">Arquivo</label>
                         <span class="divider">|</span>
                         <span class="btn-photo" onclick="iniciarCamera('prof')">Tirar Foto</span>
                     </div>
-                    <input type="file" id="input-foto-prof" accept="image/*" onchange="previewImage(this, 'preview-professor')" style="display:none">
+                    <input type="file" id="input-foto-professor" accept="image/*" onchange="previewImage(this, 'preview-professor')" style="display:none">
                 </div>
-                <div class="form-group"><label>Nome</label><input type="text" id="prof-nome" required></div>
-                <div class="form-row">
-                    <div class="form-group"><label>CPF</label><input type="text" id="prof-cpf" required></div>
-                    <div class="form-group"><label>WhatsApp</label><input type="tel" id="prof-contato" required></div>
-                </div>
-                <button type="submit" class="btn-main" id="btn-prof-save" style="background: #22c55e;">Salvar Professor</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="modal-usuario" class="modal-overlay">
-        <div class="glass-card modal-content border-cyan" style="max-width: 400px;">
-            <div class="modal-header"><h3>Cadastro de Usuário</h3><button class="btn-close" onclick="fecharModal('usuario')">×</button></div>
-            <form id="form-usuario">
-                <input type="hidden" id="edit-user-index" value="-1">
-                <div class="form-group"><label>Nome Completo</label><input type="text" id="new-user-nome" required></div>
-                <div class="form-group"><label>Login (Usuário)</label><input type="text" id="new-user-login" required></div>
-                <div class="form-group"><label>Senha</label><input type="password" id="new-user-pass" required></div>
-                <button type="submit" class="btn-main" id="btn-user-save">Criar</button>
+                <div class="form-group"><label>Nome Completo</label><input type="text" id="prof-nome" required></div>
+                <div class="form-group"><label>CPF</label><input type="text" id="prof-cpf" required></div>
+                <div class="form-group"><label>Contato</label><input type="tel" id="prof-contato" required></div>
+                <button type="submit" id="btn-prof-save" class="btn-main" style="background: #22c55e;">Salvar Professor</button>
             </form>
         </div>
     </div>
@@ -255,22 +271,18 @@
             <form id="form-modalidade">
                 <input type="hidden" id="mod-index" value="-1">
                 <div class="form-group"><label>Nome da Modalidade</label><input type="text" id="mod-nome" required></div>
-                <div class="form-group">
-                    <label>Dias de Treino</label>
-                    <div class="days-selector">
-                        <label><input type="checkbox" name="dia" value="Seg"> Seg</label>
-                        <label><input type="checkbox" name="dia" value="Ter"> Ter</label>
-                        <label><input type="checkbox" name="dia" value="Qua"> Qua</label>
-                        <label><input type="checkbox" name="dia" value="Qui"> Qui</label>
-                        <label><input type="checkbox" name="dia" value="Sex"> Sex</label>
-                        <label><input type="checkbox" name="dia" value="Sab"> Sáb</label>
-                        <label><input type="checkbox" name="dia" value="Dom"> Dom</label>
-                    </div>
-                </div>
                 <div class="form-group"><label>Professor Responsável</label><select id="mod-professor" required></select></div>
-                <div class="form-row">
-                    <div class="form-group"><label>Início</label><input type="time" id="mod-inicio" required></div>
-                    <div class="form-group"><label>Fim</label><input type="time" id="mod-fim" required></div>
+                <div class="form-row"><div class="form-group"><label>Início</label><input type="time" id="mod-inicio" required></div><div class="form-group"><label>Término</label><input type="time" id="mod-fim" required></div></div>
+                <div class="form-group">
+                    <label>Dias da Semana</label>
+                    <div class="days-selector">
+                        <label class="day-check"><input type="checkbox" name="dia" value="Seg">Seg</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Ter">Ter</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Qua">Qua</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Qui">Qui</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Sex">Sex</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Sáb">Sáb</label>
+                    </div>
                 </div>
                 <button type="submit" id="btn-salvar-modalidade" class="btn-main" style="background: #a855f7;">Salvar</button>
             </form>
@@ -281,6 +293,51 @@
         <div class="glass-card modal-content border-indigo" style="max-width: 600px;">
             <div class="modal-header"><h3>Controle de Usuários</h3><button class="btn-close" onclick="fecharModal('acesso')">×</button></div>
             <div class="table-container"><table class="table-dados"><thead><tr><th>Nome</th><th>Login</th><th>Ações</th></tr></thead><tbody id="tabela-acessos-corpo"></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="modal-usuario" class="modal-overlay">
+        <div class="glass-card modal-content border-cyan" style="max-width: 400px;">
+            <div class="modal-header"><h3>Novo Usuário</h3><button class="btn-close" onclick="fecharModal('usuario')">×</button></div>
+            <form id="form-usuario">
+                <input type="hidden" id="edit-user-index" value="-1">
+                <div class="form-group"><label>Nome</label><input type="text" id="new-user-nome" required></div>
+                <div class="form-group"><label>Login</label><input type="text" id="new-user-login" required></div>
+                <div class="form-group"><label>Senha</label><input type="password" id="new-user-pass" required></div>
+                <button type="submit" id="btn-user-save" class="btn-main" style="background: #06b6d4;">Salvar Usuário</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-fichas" class="modal-overlay">
+        <div class="glass-card modal-content border-indigo" style="max-width: 500px;">
+            <div class="modal-header"><h3>Ficha de Avaliação</h3><button class="btn-close" onclick="fecharModal('fichas')">×</button></div>
+            <form id="form-avaliacao">
+                <input type="hidden" id="av-aluno-index">
+                <div class="form-group"><label>Aluno</label><input type="text" id="av-aluno-nome" readonly></div>
+                <div class="form-group"><label>Data</label><input type="date" id="av-data" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Peso (kg)</label><input type="number" step="0.1" id="av-peso" required></div>
+                    <div class="form-group"><label>Cintura (cm)</label><input type="number" id="av-cintura" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tórax (cm)</label><input type="number" id="av-torax" required></div>
+                    <div class="form-group"><label>Quadril (cm)</label><input type="number" id="av-quadril" required></div>
+                </div>
+                <div class="form-group"><label>Observações</label><textarea id="av-obs" rows="2"></textarea></div>
+                <button type="submit" class="btn-main" style="background: #6366f1;">Salvar Avaliação</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="template-pdf" style="display: none; padding: 40px; background: white; color: black; font-family: Arial, sans-serif;">
+        <div style="text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 20px;">
+            <h1 style="margin: 0;">PROJETO MALAQUIAS</h1>
+            <p style="margin: 5px 0;">SISTEMA DE GESTÃO ESPORTIVA</p>
+        </div>
+        <div id="pdf-corpo"></div>
+        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #ddd; padding-top: 20px; font-size: 12px; color: #666;">
+            Documento gerado pelo Sistema Projeto Malaquias - Administrador: Everton Souza
         </div>
     </div>
 
