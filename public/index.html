@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projeto Malaquias - Sistema de Gestão</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div id="login-container" class="active">
+        <div class="glass-card login-box">
+            <div class="logo"><i data-lucide="shield-check"></i><h1> Projeto Malaquias</h1></div>
+            <div class="form-group">
+                <label>Usuário</label>
+                <input type="text" id="username" placeholder="Digite seu usuário">
+            </div>
+            <div class="form-group">
+                <label>Senha</label>
+                <input type="password" id="password" placeholder="Digite sua senha">
+            </div>
+            <button class="btn-main" onclick="autenticar()">Entrar</button>
+            <h2 class="dev-tag">Desenvolvedor : Everton Souza</h2>
+        </div>
+    </div>
+
+    <div id="main-dashboard">
+        <aside class="sidebar">
+            <div class="brand"><i data-lucide="activity"></i><span>Malaquias</span></div>
+            <nav>
+                <button onclick="irPara('home')" id="nav-home" class="nav-item active"><i data-lucide="layout-dashboard"></i> Início</button>
+                <button onclick="irPara('chamada')" id="nav-chamada" class="nav-item"><i data-lucide="user-check"></i> Chamada</button>
+                <button onclick="irPara('avaliacao')" id="nav-avaliacao" class="nav-item"><i data-lucide="clipboard-list"></i> Avaliação</button>
+                <button onclick="irPara('relatorios')" id="nav-relatorios" class="nav-item"><i data-lucide="file-text"></i> Relatórios</button>
+                <button onclick="logout()" class="nav-item logout"><i data-lucide="log-out"></i> Sair</button>
+            </nav>
+        </aside>
+
+        <main class="content">
+            <header>
+                <h2 id="page-title">Painel Administrativo</h2>
+                <div class="user-info">
+                    <span id="user-display-name">---</span>
+                    <div class="avatar" id="user-avatar">?</div>
+                </div>
+            </header>
+
+            <section id="screen-home" class="screen active">
+                <div class="grid-actions">
+                    <div class="card-action cyan" onclick="abrirModal('usuario')"><i data-lucide="user-cog"></i><h3>Novo Usuário</h3><p>Acessos</p></div>
+                    <div class="card-action blue" onclick="abrirModal('aluno')"><i data-lucide="user-plus"></i><h3>Novo Aluno</h3><p>Cadastrar</p></div>
+                    <div class="card-action green" onclick="abrirModal('professor')"><i data-lucide="graduation-cap"></i><h3>Professor</h3><p>Gerenciar</p></div>
+                    <div class="card-action purple" onclick="abrirModal('modalidades')"><i data-lucide="trophy"></i><h3>Modalidades</h3><p>Esportes</p></div>
+                    <div class="card-action yellow" onclick="irPara('dados')"><i data-lucide="database"></i><h3>Dados Cadastrados</h3><p>Consultar/Editar</p></div>
+                    <div class="card-action indigo" onclick="abrirModal('acesso')"><i data-lucide="shield-plus"></i><h3>Gestão Acesso</h3><p>Logs</p></div>
+                </div>
+            </section>
+
+            <section id="screen-chamada" class="screen" style="display:none;">
+                <div class="glass-card">
+                    <div class="filters-grid">
+                        <div class="form-group"><label>Mês / Ano</label><input type="month" id="filtro-mes" onchange="gerarTabelaChamada()"></div>
+                        <div class="form-group"><label>Modalidade</label><select id="filtro-modalidade" onchange="gerarTabelaChamada()"></select></div>
+                        <div class="form-group"><label>Professor</label><select id="filtro-professor" onchange="gerarTabelaChamada()"></select></div>
+                    </div>
+                    <div class="chamada-container">
+                        <table class="table-chamada"><thead id="head-chamada"></thead><tbody id="body-chamada"></tbody></table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="screen-avaliacao" class="screen" style="display:none;">
+                <div class="glass-card">
+                    <div class="form-group">
+                        <label>Buscar Aluno para Avaliação</label>
+                        <input type="text" id="input-busca-avaliacao" placeholder="Digite o nome do aluno..." oninput="renderBuscaAvaliacao()">
+                    </div>
+                    <div class="table-container">
+                        <table class="table-dados">
+                            <thead>
+                                <tr><th>Aluno</th><th>Modalidade</th><th>Ação</th></tr>
+                            </thead>
+                            <tbody id="body-busca-avaliacao"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="container-grafico-evolucao" class="glass-card" style="display: none; margin-top: 20px; border-color: #a855f7;">
+                    <div class="modal-header">
+                        <h3>Evolução de <span id="nome-aluno-grafico"></span></h3>
+                        <button class="btn-close" onclick="fecharGrafico()">×</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chartEvolucao"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="screen-relatorios" class="screen" style="display:none;">
+                <div class="glass-card">
+                    <div class="filters-grid">
+                        <div class="form-group"><label>Mês</label><input type="month" id="rel-mes"></div>
+                        <div class="form-group"><label>Modalidade</label><select id="rel-modalidade"></select></div>
+                        <div class="form-group"><label>Professor</label><select id="rel-professor"></select></div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-main" onclick="gerarRelatorio('filtro')" style="background: #22c55e;">Gerar Frequência</button>
+                        <button class="btn-main" onclick="gerarRelatorio('geral')" style="background: #3b82f6;">Lista Geral Alunos</button>
+                        <button class="btn-main" onclick="gerarRelatorio('avaliacoes')" style="background: #a855f7;">Relatório de Avaliações</button>
+                        <button class="btn-main" onclick="window.print()" style="background: #64748b; width: 140px;"><i data-lucide="printer"></i> Imprimir</button>
+                    </div>
+                    <div id="print-area" class="relatorio-impressao">
+                        <div class="header-print">
+                            <h2>Projeto Malaquias - Relatório Oficial</h2>
+                            <p id="info-relatorio"></p>
+                        </div>
+                        <table class="table-dados" id="tabela-relatorio">
+                            <thead><tr id="head-relatorio"></tr></thead>
+                            <tbody id="body-relatorio"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="screen-dados" class="screen" style="display:none;">
+                <div class="glass-card" style="margin-bottom: 20px; border-color: #fb923c;">
+                    <div class="form-group">
+                        <label style="color: #fb923c;">Importar Alunos via Planilha (Link CSV)</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="link-planilha" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv">
+                            <button class="btn-main" onclick="importarDados()" style="width: 150px; background: #fb923c;">Importar</button>
+                        </div>
+                        <small style="color: #94a3b8; font-size: 10px; margin-top: 5px;">A planilha deve ter as colunas: nome, nascimento, contato, endereco, modalidade, professor.</small>
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <div class="filters-grid">
+                        <div class="form-group">
+                            <label>Categoria</label>
+                            <select id="busca-categoria" onchange="renderBuscaGeral()">
+                                <option value="alunos">Alunos</option>
+                                <option value="professores">Professores</option>
+                                <option value="modalidades">Modalidades</option>
+                                <option value="usuarios">Acessos (Usuários)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label>Buscar por nome</label>
+                            <input type="text" id="input-busca-geral" placeholder="Digite para filtrar..." oninput="renderBuscaGeral()">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="table-dados">
+                            <thead id="head-busca-geral"></thead>
+                            <tbody id="body-busca-geral"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="modal-aluno" class="modal-overlay">
+        <div class="glass-card modal-content border-blue" style="max-width: 750px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header"><h3>Cadastro de Aluno</h3><button class="btn-close" onclick="fecharModal('aluno')">×</button></div>
+            <form id="form-aluno">
+                <input type="hidden" id="edit-aluno-index" value="-1">
+                
+                <div class="photo-section">
+                    <div class="camera-container" id="camera-wrapper-aluno" style="display:none;">
+                        <video id="video-aluno" autoplay playsinline></video>
+                        <div class="camera-controls">
+                            <button type="button" class="btn-switch" onclick="alternarCamera('aluno')"><i data-lucide="refresh-cw"></i></button>
+                            <button type="button" class="btn-capture" onclick="capturarFoto('aluno')"><i data-lucide="camera"></i></button>
+                        </div>
+                    </div>
+                    <div class="avatar-preview" id="preview-aluno"><i data-lucide="camera"></i></div>
+                    <div class="btn-photo-group">
+                        <label for="input-foto-aluno" class="btn-photo">Arquivo</label>
+                        <span class="divider">|</span>
+                        <span class="btn-photo" onclick="iniciarCamera('aluno')">Tirar Foto</span>
+                    </div>
+                    <input type="file" id="input-foto-aluno" accept="image/*" onchange="previewImage(this, 'preview-aluno')" style="display:none">
+                </div>
+
+                <div class="form-group"><label>Nome Completo</label><input type="text" id="aluno-nome" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Nascimento</label><input type="date" id="aluno-nascimento" required></div>
+                    <div class="form-group"><label>WhatsApp</label><input type="tel" id="aluno-contato" required></div>
+                </div>
+                <div class="form-group"><label>Endereço</label><input type="text" id="aluno-endereco" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Modalidade</label><select id="aluno-modalidade" required></select></div>
+                    <div class="form-group"><label>Professor</label><select id="aluno-professor" required></select></div>
+                </div>
+                
+                <h4 class="section-title">Dados Antropométricos</h4>
+                <div class="form-row-triple">
+                    <div class="form-group"><label>Peso (kg)</label><input type="number" step="0.1" id="aluno-peso" oninput="calcularIMC()"></div>
+                    <div class="form-group"><label>Altura (m)</label><input type="number" step="0.01" id="aluno-altura" oninput="calcularIMC()"></div>
+                    <div class="form-group"><label>IMC</label><input type="text" id="aluno-imc" readonly style="background: rgba(34, 211, 238, 0.1); color: #22d3ee; font-weight: bold;"></div>
+                </div>
+
+                <div class="imc-gauge-container">
+                    <div class="gauge">
+                        <div class="gauge-body">
+                            <div class="gauge-fill-bg"></div>
+                            <div class="gauge-cover"></div>
+                        </div>
+                        <div class="gauge-needle" id="imc-needle"></div>
+                    </div>
+                    <div class="gauge-labels">
+                        <span style="color: #3b82f6;">Abaixo</span>
+                        <span style="color: #22c55e;">Normal</span>
+                        <span style="color: #eab308;">Sobrepeso</span>
+                        <span style="color: #ef4444;">Obeso</span>
+                    </div>
+                </div>
+
+                <h4 class="section-title">Medidas (cm)</h4>
+                <div class="form-row-triple">
+                    <div class="form-group"><label>Cintura</label><input type="number" id="aluno-cintura"></div>
+                    <div class="form-group"><label>Tórax</label><input type="number" id="aluno-torax"></div>
+                    <div class="form-group"><label>Quadril</label><input type="number" id="aluno-quadril"></div>
+                </div>
+                <div class="form-group"><label>Observações</label><textarea id="aluno-obs" rows="3"></textarea></div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn-diet" onclick="gerarArquivoDieta()"><i data-lucide="apple"></i> Dieta Sugerida (PDF)</button>
+                    <button type="submit" id="btn-aluno-save" class="btn-main">Salvar Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-professor" class="modal-overlay">
+        <div class="glass-card modal-content border-green" style="max-width: 500px;">
+            <div class="modal-header"><h3>Cadastro de Professor</h3><button class="btn-close" onclick="fecharModal('professor')">×</button></div>
+            <form id="form-professor">
+                <input type="hidden" id="edit-prof-index" value="-1">
+                <div class="photo-section">
+                    <div class="camera-container" id="camera-wrapper-prof" style="display:none;">
+                        <video id="video-prof" autoplay playsinline></video>
+                        <div class="camera-controls">
+                            <button type="button" class="btn-switch" onclick="alternarCamera('prof')"><i data-lucide="refresh-cw"></i></button>
+                            <button type="button" class="btn-capture" onclick="capturarFoto('prof')"><i data-lucide="camera"></i></button>
+                        </div>
+                    </div>
+                    <div class="avatar-preview" id="preview-professor"><i data-lucide="camera"></i></div>
+                    <div class="btn-photo-group">
+                        <label for="input-foto-professor" class="btn-photo">Arquivo</label>
+                        <span class="divider">|</span>
+                        <span class="btn-photo" onclick="iniciarCamera('prof')">Tirar Foto</span>
+                    </div>
+                    <input type="file" id="input-foto-professor" accept="image/*" onchange="previewImage(this, 'preview-professor')" style="display:none">
+                </div>
+                <div class="form-group"><label>Nome Completo</label><input type="text" id="prof-nome" required></div>
+                <div class="form-group"><label>CPF</label><input type="text" id="prof-cpf" required></div>
+                <div class="form-group"><label>Contato</label><input type="tel" id="prof-contato" required></div>
+                <button type="submit" id="btn-prof-save" class="btn-main" style="background: #22c55e;">Salvar Professor</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-modalidades" class="modal-overlay">
+        <div class="glass-card modal-content border-purple" style="max-width: 550px;">
+            <div class="modal-header"><h3>Gerenciar Modalidades</h3><button class="btn-close" onclick="fecharModal('modalidades')">×</button></div>
+            <form id="form-modalidade">
+                <input type="hidden" id="mod-index" value="-1">
+                <div class="form-group"><label>Nome da Modalidade</label><input type="text" id="mod-nome" required></div>
+                <div class="form-group"><label>Professor Responsável</label><select id="mod-professor" required></select></div>
+                <div class="form-row"><div class="form-group"><label>Início</label><input type="time" id="mod-inicio" required></div><div class="form-group"><label>Término</label><input type="time" id="mod-fim" required></div></div>
+                <div class="form-group">
+                    <label>Dias da Semana</label>
+                    <div class="days-selector">
+                        <label class="day-check"><input type="checkbox" name="dia" value="Seg">Seg</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Ter">Ter</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Qua">Qua</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Qui">Qui</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Sex">Sex</label>
+                        <label class="day-check"><input type="checkbox" name="dia" value="Sáb">Sáb</label>
+                    </div>
+                </div>
+                <button type="submit" id="btn-salvar-modalidade" class="btn-main" style="background: #a855f7;">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-acesso" class="modal-overlay">
+        <div class="glass-card modal-content border-indigo" style="max-width: 600px;">
+            <div class="modal-header"><h3>Controle de Usuários</h3><button class="btn-close" onclick="fecharModal('acesso')">×</button></div>
+            <div class="table-container"><table class="table-dados"><thead><tr><th>Nome</th><th>Login</th><th>Ações</th></tr></thead><tbody id="tabela-acessos-corpo"></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="modal-usuario" class="modal-overlay">
+        <div class="glass-card modal-content border-cyan" style="max-width: 400px;">
+            <div class="modal-header"><h3>Novo Usuário</h3><button class="btn-close" onclick="fecharModal('usuario')">×</button></div>
+            <form id="form-usuario">
+                <input type="hidden" id="edit-user-index" value="-1">
+                <div class="form-group"><label>Nome</label><input type="text" id="new-user-nome" required></div>
+                <div class="form-group"><label>Login</label><input type="text" id="new-user-login" required></div>
+                <div class="form-group"><label>Senha</label><input type="password" id="new-user-pass" required></div>
+                <button type="submit" id="btn-user-save" class="btn-main" style="background: #06b6d4;">Salvar Usuário</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-fichas" class="modal-overlay">
+        <div class="glass-card modal-content border-indigo" style="max-width: 500px;">
+            <div class="modal-header"><h3>Ficha de Avaliação</h3><button class="btn-close" onclick="fecharModal('fichas')">×</button></div>
+            <form id="form-avaliacao">
+                <input type="hidden" id="av-aluno-index">
+                <div class="form-group"><label>Aluno</label><input type="text" id="av-aluno-nome" readonly></div>
+                <div class="form-group"><label>Data</label><input type="date" id="av-data" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Peso (kg)</label><input type="number" step="0.1" id="av-peso" required></div>
+                    <div class="form-group"><label>Cintura (cm)</label><input type="number" id="av-cintura" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tórax (cm)</label><input type="number" id="av-torax" required></div>
+                    <div class="form-group"><label>Quadril (cm)</label><input type="number" id="av-quadril" required></div>
+                </div>
+                <div class="form-group"><label>Observações</label><textarea id="av-obs" rows="2"></textarea></div>
+                <button type="submit" class="btn-main" style="background: #6366f1;">Salvar Avaliação</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="template-pdf" style="display: none; padding: 40px; background: white; color: black; font-family: Arial, sans-serif;">
+        <div style="text-align: center; border-bottom: 2px solid #3b82f6; padding-bottom: 20px;">
+            <h1 style="margin: 0;">PROJETO MALAQUIAS</h1>
+            <p style="margin: 5px 0;">SISTEMA DE GESTÃO ESPORTIVA</p>
+        </div>
+        <div id="pdf-corpo"></div>
+        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #ddd; padding-top: 20px; font-size: 12px; color: #666;">
+            Documento gerado pelo Sistema Projeto Malaquias - Administrador: Everton Souza
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
